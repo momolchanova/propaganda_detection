@@ -1,0 +1,234 @@
+app = Flask(__name__)
+
+# Завантаження моделей Stanza для української мови
+stanza.download('uk')
+nlp = stanza.Pipeline('uk', processors='tokenize,mwt,pos,lemma,ner')
+
+stop_words = set([
+    "і", "в", "во", "не", "на", "що", "я", "у", "з", "до", "за", "та", "чи", "ти", "ви", "ані", "млн", "реальний", "заявляти",
+    "ми", "це", "його", "її", "від", "для", "про", "як", "із", "тощо", "але", "ще", "ну", "весь", "коли",
+    "уже", "також", "ж", "же", "або", "ніж", "де", "бо", "би", "під", "після", "перед", "над", "із", "поза"
+])
+
+# Препроцесинг тексту
+def preprocess_text(text):
+    text = re.sub(r'[^\w\s]', '', text)  # Видалення небуквенно-цифрових символів
+    text = re.sub(r'\d+', '', text)  # Видалення чисел
+    doc = nlp(text.lower())
+    words = [word.lemma for sentence in doc.sentences for word in sentence.words if word.upos != 'PROPN']
+    words = [word for word in words if word not in stop_words and len(word) > 1]
+    return words
+
+# Визначення об'єктів пропаганди
+def identify_propaganda_entities(text):
+    doc = nlp(text)
+    entities = [(ent.text, ent.type) for ent in doc.ents]
+    return entities
+
+# Перевірка абревіатури
+def is_abbreviation(word):
+    return word.isupper() and len(word) > 1
+
+def is_abbreviation(word):
+    return re.match(r'^[А-ЯҐЄІЇ]{2,}$', word) is not None
+
+def save_abbreviations(text):
+    abbreviations = {}
+    tokens = text.split()
+    for i, token in enumerate(tokens):
+        if is_abbreviation(token):
+            abbreviations[f'ABBR{i}'] = token
+            tokens[i] = f'ABBR{i}'
+    return ' '.join(tokens), abbreviations
+
+def restore_abbreviations(text, abbreviations):
+    for key, value in abbreviations.items():
+        text = text.replace(key, value)
+    return text
+
+def lemmatize(text):
+    text, abbreviations = save_abbreviations(text)
+    doc = nlp(text)
+    lemmatized_text = []
+    for sent in doc.sentences:
+        for word in sent.words:
+            lemmatized_text.append(word.lemma)
+    lemmatized_text = ' '.join(lemmatized_text).lower()
+    lemmatized_text = restore_abbreviations(lemmatized_text, abbreviations)
+    return lemmatized_text
+
+# Навчання моделі FastText на вхідному тексті
+def train_fasttext_model(text):
+    sentences = [preprocess_text(text)]
+    ft_model = FastText(sentences, vector_size=100, window=3, min_count=1, workers=4, sg=1)
+    return ft_model
+
+# Отримання подібних слів за допомогою моделі FastText
+def get_similar_words(model, word):
+    try:
+        similar_words = model.wv.most_similar(word, topn=4)
+        return [(sim_word, score) for sim_word, score in similar_words]
+    except KeyError:
+        return []
+
+def highlight_text(text, entities, similar_words, base_words_to_highlight):
+    highlighted_text = text
+    # Highlight entities
+    for entity, _ in entities:
+        highlighted_text = re.sub(re.escape(entity), f"<span class='highlight'>{entity}</span>", highlighted_text)
+    # Highlight similar words in base form
+    for word in base_words_to_highlight:
+        highlighted_text = re.sub(re.escape(word), f"<span class='highlight'>{word}</span>", highlighted_text)
+    return highlighted_text
+
+result_lines = []
+    for entity, _ in entities:
+        if entity.lower() in techniques:
+            result_lines.append(f"{entity}, {techniques[entity.lower()]}")
+
+    if not result_lines:
+        return "Техніки не знайдено для зазначених об'єктів."
+
+    return "<br>".join(result_lines)
+
+
+@app.route('/')
+def index():
+    return render_template('index_eng.html', text="", result="")
+
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    text = request.form['text']
+    action = request.form['action']
+
+    result = ""
+    highlighted_text = ""
+
+    # <strong>Використані техніки: </strong>
+    if action == 'lemmatize':
+        processed_text = lemmatize(text)
+        result = f"Лематизований текст: {processed_text}"
+    elif action == 'identify':
+        entities = identify_propaganda_entities(text)
+        ft_model = train_fasttext_model(text)
+        lemmatized_text = set(preprocess_text(text))  # Лематизований базовий текст
+
+        # Лематизуємо всі знайдені НЕР
+        lemmatized_entities = [(lemmatize(entity) if not is_abbreviation(entity) else entity, entity_type) for entity, entity_type in entities]
+
+        # Відслідковування оброблених сутностей, щоб уникнути дублікатів
+        processed_entities = set()
+        entities_with_similar_words = []
+        all_similar_words = []
+
+        for lemmatized_entity, entity_type in lemmatized_entities:
+            if lemmatized_entity.lower() not in processed_entities:
+                processed_entities.add(lemmatized_entity.lower())
+                similar_words = get_similar_words(ft_model, lemmatized_entity.lower())
+                lemmatized_similar_words = set(preprocess_text(' '.join([sim_word for sim_word, _ in similar_words])))
+                filtered_similar_words = [(word, score) for word, score in similar_words if word in lemmatized_text and word not in lemmatized_entity.lower().split()]
+
+                if filtered_similar_words:
+                    entities_with_similar_words.append((lemmatized_entity, entity_type, filtered_similar_words))
+                    all_similar_words.extend(filtered_similar_words)
+
+        doc = nlp(text.lower())
+        base_words_to_highlight = set()
+        for sent in doc.sentences:
+            for word in sent.words:
+                if word.lemma in [sim_word for sim_word, _ in all_similar_words]:
+                    base_words_to_highlight.add(word.text)
+
+        highlighted_text = highlight_text(text, entities, all_similar_words, base_words_to_highlight)
+        result = Markup(
+           # "Множина іменованих сутностей з семантично-близькими об’єктами за аналізом контекстних залежностей:<br><br>" +
+            "The set of named entities with semantically close objects according to the analysis of contextual dependencies:<br>"+
+            "<br>".join([
+                f"<strong>{entity}</strong>, {entity_type}, {', '.join([f'{sim_word} ({score:.2f})' for sim_word, score in similar_words])}"
+                for entity, entity_type, similar_words in entities_with_similar_words
+            ])
+        )
+
+Код розмітки:
+
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Аналіз об'єктів пропаганди</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .container {
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        .text-area-container {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 14px;
+            min-height: 150px;
+        }
+
+        .highlight {
+            background-color: yellow;
+            font-weight: bold;
+        }
+
+        .result-container, .techniques-result-container {
+            margin-top: 20px;
+        }
+
+        .techniques-result-container {
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+        }
+
+        .result-container p, .techniques-result-container p {
+            white-space: pre-wrap; /* Зберігає форматування, включаючи нові рядки */
+        }
+    </style>
+</head>
+<body>
+    <h1>Аналіз об'єктів пропаганди</h1>
+    <form method="post" action="/analyze">
+        <label for="text">Текст для аналізу:</label><br>
+        <textarea id="text" name="text" rows="10" cols="50">{{ text }}</textarea><br><br>
+        <button type="submit" name="action" value="lemmatize">Перекласти текст на English</button>
+        <button type="submit" name="action" value="identify">Показати об'єкти пропаганди</button>
+        <button type="submit" name="action" value="analyze_techniques">Визначити приналежність об'єктів використаним технікам</button>
+    </form>
+    <div class="result-container">
+        {% if result %}
+            <h2>Результат аналізу:</h2>
+            <p>{{ result|safe }}</p>
+        {% endif %}
+        {% if highlighted_text %}
+            <h2>Множина використаних об'єктів пропаганди у тексті:</h2>
+            <p>{{ highlighted_text|safe }}</p>
+        {% endif %}
+    </div>
+    <div class="techniques-result-container">
+        {% if techniques_result %}
+            <h2>Сили прояву використаних технік та приналежність їм тематичних об'єктів:</h2>
+            <p>{{ techniques_result|safe }}</p>
+        {% endif %}
+    </div>
+</body>
+</html>
