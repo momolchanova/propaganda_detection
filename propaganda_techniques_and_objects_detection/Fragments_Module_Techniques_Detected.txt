@@ -1,0 +1,320 @@
+Код навчання моделі 'bert-base-multilingual-cased' для виявлення прийому Exaggeration: 
+import os
+from sklearn.model_selection import train_test_split
+from datasets import Dataset
+import pandas as pd
+
+def load_data(data_dir):
+    texts = []
+    labels = []
+    label_map = {
+        "Other": 0,
+        "Exaggeration": 1
+    }
+
+    for label_name, label in label_map.items():
+        folder_path = os.path.join(data_dir, label_name)
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+                texts.append(text)
+                labels.append(label)
+
+    return texts, labels
+
+data_dir = 'train_for_clases'
+texts, labels = load_data(data_dir)
+
+# Розділення на тренувальні та тестові набори
+X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42)
+
+# Створення датафреймів
+train_df = pd.DataFrame({'text': X_train, 'label': y_train})
+test_df = pd.DataFrame({'text': X_test, 'label': y_test})
+
+# Перетворення на Hugging Face Datasets
+train_dataset = Dataset.from_pandas(train_df)
+test_dataset = Dataset.from_pandas(test_df)
+
+from transformers import Trainer, TrainingArguments, AutoTokenizer, TFAutoModelForSequenceClassification
+
+def train_model(model_name, train_dataset, test_dataset, output_dir):
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+
+    def preprocess_function(examples):
+        return tokenizer(examples['text'], truncation=True, padding=True, max_length=512)
+
+    train_dataset = train_dataset.map(preprocess_function, batched=True)
+    test_dataset = test_dataset.map(preprocess_function, batched=True)
+
+    training_args = TrainingArguments(
+        output_dir=output_dir,
+        evaluation_strategy="epoch",
+        learning_rate=2e-5,
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=8,
+        num_train_epochs=3,
+        weight_decay=0.01,
+        logging_dir='./logs',
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=test_dataset,
+        tokenizer=tokenizer,
+    )
+
+    trainer.train()
+
+# Навчання моделi 'bert-base-multilingual-cased'
+train_model('bert-base-multilingual-cased', train_dataset, test_dataset, './bert_model')
+
+Код навчання моделі 'roberta-base' для виявлення прийому Appeal_to_Authority: 
+import os
+from sklearn.model_selection import train_test_split
+from datasets import Dataset
+import pandas as pd
+
+def load_data(data_dir):
+    texts = []
+    labels = []
+    label_map = {
+        "Other": 0,
+        " Appeal_to_Authority": 1
+    }
+
+    for label_name, label in label_map.items():
+        folder_path = os.path.join(data_dir, label_name)
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+                texts.append(text)
+                labels.append(label)
+
+    return texts, labels
+
+data_dir = 'train_for_clases'
+texts, labels = load_data(data_dir)
+
+# Розділення на тренувальні та тестові набори
+X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42)
+
+# Створення датафреймів
+train_df = pd.DataFrame({'text': X_train, 'label': y_train})
+test_df = pd.DataFrame({'text': X_test, 'label': y_test})
+
+# Перетворення на Hugging Face Datasets
+train_dataset = Dataset.from_pandas(train_df)
+test_dataset = Dataset.from_pandas(test_df)
+
+from transformers import Trainer, TrainingArguments, AutoTokenizer, TFAutoModelForSequenceClassification
+
+def train_model(model_name, train_dataset, test_dataset, output_dir):
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+
+    def preprocess_function(examples):
+        return tokenizer(examples['text'], truncation=True, padding=True, max_length=512)
+
+    train_dataset = train_dataset.map(preprocess_function, batched=True)
+    test_dataset = test_dataset.map(preprocess_function, batched=True)
+
+    training_args = TrainingArguments(
+        output_dir=output_dir,
+        evaluation_strategy="epoch",
+        learning_rate=2e-5,
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=8,
+        num_train_epochs=3,
+        weight_decay=0.01,
+        logging_dir='./logs',
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=test_dataset,
+        tokenizer=tokenizer,
+    )
+
+    trainer.train()
+
+# Навчання моделі 'roberta-base'
+train_model('roberta-base', train_dataset, test_dataset, './roberta_model')
+
+Код навчання моделі ‘ukr_electra’ для виявлення прийому Dabt:
+ import os
+from sklearn.model_selection import train_test_split
+from datasets import Dataset
+import pandas as pd
+
+def load_data(data_dir):
+    texts = []
+    labels = []
+    label_map = {
+        "Other": 0,
+        "Dabt": 1
+    }
+
+    for label_name, label in label_map.items():
+        folder_path = os.path.join(data_dir, label_name)
+        for filename in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, filename)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+                texts.append(text)
+                labels.append(label)
+
+    return texts, labels
+
+data_dir = 'train_for_clases'
+texts, labels = load_data(data_dir)
+
+# Розділення на тренувальні та тестові набори
+X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42)
+
+# Створення датафреймів
+train_df = pd.DataFrame({'text': X_train, 'label': y_train})
+test_df = pd.DataFrame({'text': X_test, 'label': y_test})
+
+# Перетворення на Hugging Face Datasets
+train_dataset = Dataset.from_pandas(train_df)
+test_dataset = Dataset.from_pandas(test_df)
+
+from transformers import Trainer, TrainingArguments, AutoTokenizer, TFAutoModelForSequenceClassification
+
+def train_model(model_name, train_dataset, test_dataset, output_dir):
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = TFAutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+
+    def preprocess_function(examples):
+        return tokenizer(examples['text'], truncation=True, padding=True, max_length=512)
+
+    train_dataset = train_dataset.map(preprocess_function, batched=True)
+    test_dataset = test_dataset.map(preprocess_function, batched=True)
+
+    training_args = TrainingArguments(
+        output_dir=output_dir,
+        evaluation_strategy="epoch",
+        learning_rate=2e-5,
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=8,
+        num_train_epochs=3,
+        weight_decay=0.01,
+        logging_dir='./logs',
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_dataset,
+        eval_dataset=test_dataset,
+        tokenizer=tokenizer,
+    )
+
+    trainer.train()
+
+# Навчання моделі ukr_electra
+train_model('VSEnlp/ukr-electra-base', train_dataset, test_dataset, './ukr_electra_model')
+
+Код використання навчених моделей з поясненням LIME для веб-сайту:
+def predict_proba(texts):
+    sequences = tokenizer.texts_to_sequences(texts)
+    padded = pad_sequences(sequences, maxlen=max_sequence_length)
+    return model.predict(padded)
+
+# Перекодування текстової інстанції у випадку потреби
+text_instance = tokenizer.sequences_to_texts([text_instance])[0]
+
+# Вивід текстової інстанції перед поясненням
+print("text_instance")
+print(text_instance)
+
+# Вивід прогнозу перед поясненням
+print("predict_proba")
+print(predict_proba([text_instance]))
+
+# Пояснення за допомогою LIME
+exp = explainer.explain_instance(text_instance, predict_proba, num_features=15, labels=(0,))
+# HTML шаблон для відображення результатів
+html_template = """
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Звіт про класифікацію та LIME пояснення</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }}
+        .container {{
+            width: 80%;
+            margin: 0 auto;
+            background-color: #f9f9f9;
+            border: 1px solid #ccc;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }}
+        .header {{
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }}
+        .section {{
+            margin-bottom: 20px;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }}
+        th, td {{
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }}
+        th {{
+            background-color: #f2f2f2;
+        }}
+        .lime-explanation {{
+            margin-bottom: 20px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="header">Звіт про класифікацію та LIME пояснення</h2>
+        <div class="section">
+            <h3>Звіт про класифікацію</h3>
+            <pre>{classification_report}</pre>
+        </div>
+        <div class="section lime-explanation">
+            <h3>LIME пояснення</h3>
+            {lime_explanation}
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+# Генерація HTML контенту
+html_content = html_template.format(
+    classification_report=report,
+    lime_explanation=exp.as_html()
+)
+
+# Збереження HTML візуалізації в файл
+html_file = 'classification_lime_explanation.html'
+with open(html_file, 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+# Відкриття HTML файлу у веб-браузері
+import webbrowser
+webbrowser.open_new_tab(html_file)
